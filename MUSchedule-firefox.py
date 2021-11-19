@@ -7,14 +7,10 @@ from datetime import date
 import smtplib
 from getpass import getpass
 import imghdr
+from email.message import EmailMessage
+import tempfile
 import sys
 from datetime import datetime
-
-from discordwebhook import Discord
-import requests
-import json
-import feedparser
-import subprocess
 
 __author__ = "Pierre-Louis D'Agostino"
 __email__ = "200197@umons.ac.be"
@@ -22,8 +18,10 @@ __email__ = "200197@umons.ac.be"
 """
 VARIABLES GLOBALES
 """
-# URL discord webhook (à créer via les param. d'un channel discord)
-discord = Discord(url="")
+# Adresse mail GMAIL envoyeur
+Sender_Email = ""
+# Adresse mail GMAIL receveur
+Reciever_Email = ""
 
 # Adresse mail UMons (matricule@umons.ac.be)
 user = ""
@@ -76,25 +74,34 @@ else:
     print("Weekly Mode")
     driver.find_element(By.CLASS_NAME, "fc-agendaWeek-button").click()
     checkday("")
-driver.get_screenshot_as_file("./screenshot.png")
+tmp = tempfile.NamedTemporaryFile(suffix=".png", mode='wb')
+png = driver.get_screenshot_as_png()
+tmp.write(png)
+
 driver.quit()
 
-print("Sending to discord ...")
+print("Sending email...")
 
-newMessage = "Horaire "+str(date.today()) + " " + str(user)
+# Send Email (Be carefull to change your Google settings to allow less )
+#Password = getpass()
+newMessage = EmailMessage()
+newMessage['Subject'] = "Horaire "+str(date.today())
+newMessage['From'] = Sender_Email
+newMessage['To'] = Reciever_Email
+newMessage.set_content('Voici l\'horaire de la semaine !')
+image_data = png
+image_type = ".png"
+image_name = "Horaire.png"
 
-cmd = subprocess.Popen(
-    "curl --upload-file ./screenshot.png https://transfer.sh/screenshot.png", stdout=subprocess.PIPE, shell=True)
-out = cmd.communicate()[0].decode("utf-8")
+print("Sending email... GMail password needed.")
 
+# Send Email (Be carefull to change your Google settings to allow less )
+Password = getpass()
+newMessage.add_attachment(image_data, maintype='image',
+                          subtype=image_type, filename=image_name)
 try:
-    discord.post(
-        embeds=[
-            {
-                "title": newMessage,
-                "image": {"url": out},
-            },
-        ],
-    )
+    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
+        smtp.login(Sender_Email, Password)
+        smtp.send_message(newMessage)
 except:
-    print("Message not sent.")
+    print("Email not sent. Verify username, password and Gmail configuration.")
